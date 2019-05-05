@@ -40,7 +40,7 @@ Successfully uploaded 5442 files, failed to upload 0 files
 
 ## TODOs
 
-- Figure out how to make existing Albums writable
+- Figure out how to make existing Albums writable (see also: https://github.com/ChrisRut/google-photos-uploader/blob/456ce354a7367717da86dfb7ee82761a11bb332f/google-photos-uploader.py#L87)
 - Provide caching of credentials so you don't need to re-authenticate on every run
 - Add Travis CI
     - Add linting
