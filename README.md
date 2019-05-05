@@ -24,9 +24,10 @@ Enter the authorization code:
 ![copy code](assets/copy_code.png)
 5. Enter in your authorization code in the terminal and hit enter.
 
-Note: If the album doesn't exist this script will create it for you.
+Note: If the album doesn't exist this script will create it for you.  If the album exists but wasn't created by this 
+script it is likely not writeable and therefore the script will fail and ask you to pick another album name (see [TODOs](#todos)). 
 
-## Example Run
+### Example Run
 
 ```bash
 $ ./uploader.py -a "My Photos" -d photos/
@@ -39,6 +40,7 @@ Successfully uploaded 5442 files, failed to upload 0 files
 
 ## TODOs
 
+- Figure out how to make existing Albums writable
 - Provide caching of credentials so you don't need to re-authenticate on every run
 - Add Travis CI
     - Add linting

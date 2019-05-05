@@ -13,6 +13,17 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from tqdm import tqdm
 
 
+def fatal_code(e):
+    """
+    Only give up on non-429 status codes, otherwise re-try call w/ backoff
+    See also: https://github.com/litl/backoff
+    :param e: Exception object
+    :type e: object
+    :return: True if the status code is != 429, otherwise false
+    :rtype: bool
+    """
+    return e.response.status_code != 429
+
 class GooglePhotosUploader(object):
     def __init__(self, credentials_file, log_level):
         """
@@ -25,6 +36,9 @@ class GooglePhotosUploader(object):
         self.logger = logging.getLogger('google-photos-uploader')
         self.logger.addHandler(logging.StreamHandler())
         self.logger.setLevel(log_level)
+        # setup backoff logger
+        logging.getLogger('backoff').addHandler(logging.StreamHandler())
+        logging.getLogger('backoff').setLevel(log_level)
 
         # Setup authenticated session
         flow = InstalledAppFlow.from_client_secrets_file(
@@ -70,6 +84,7 @@ class GooglePhotosUploader(object):
             for album in resp.json().get('albums', []):
                 if album.get('title') == album_title:
                     self.logger.debug(f"Found {album_title}, ID: {album['id']}")
+                    assert album.get('isWriteable', False), f"The '{album_title}' album is not writable, please choose another Album name to create a new Album"
                     return album['id']
         # Unable to find album, prompt the user to create it
         self.logger.warning(f"Unable to find the album '{album_title}'.")
@@ -89,6 +104,7 @@ class GooglePhotosUploader(object):
         self.logger.info(f"Found {len(files)} files in {directory}")
         return files
 
+    @backoff.on_exception(backoff.expo, requests.exceptions.RequestException, giveup=fatal_code)  # Gracefully handle throttling
     def upload_file(self, upload_file):
         """
         Given file upload it to Google Photos
@@ -108,58 +124,68 @@ class GooglePhotosUploader(object):
                 },
                 data=f,
             )
-            if resp.status_code != 200:
-                import pdb ; pdb.set_trace()
-                self.logger.error(f"Failed to upload {upload_file}: {resp.json()}")
-                return None
+            resp.raise_for_status()
             self.logger.debug(f"Successfully uploaded {upload_file}: {resp.text}")
             return resp.text
 
-    @backoff.on_exception(backoff.expo, requests.exceptions.RequestException)
-    def add_file_to_album(self, album_id, upload_token):
+    def upload_files(self, files):
         """
-        Given an Album ID and Upload Token, add the file to the album
-        See also: https://developers.google.com/photos/library/reference/rest/v1/mediaItems/batchCreate
-        :param album_id: The ID of the Google Photos Album
-        :type album_id: basestring
-        :param upload_token: Upload Token of file uploaded to Google Photos
-        :type upload_token: basestring
-        """
-        data = {
-            'albumId': album_id,
-            'newMediaItems': [{
-                'simpleMediaItem': {
-                    'uploadToken': upload_token
-                }
-            }]
-        }
-        resp = self.authed_session.post(
-            'https://photoslibrary.googleapis.com/v1/mediaItems:batchCreate',
-            data=json.dumps(data)
-        )
-        resp.raise_for_status()
-        results = resp.json()['newMediaItemResults']
-        assert len(results) == 1, f"Expected to find 1 mediaItem instead found {len(results)}: {resp.json()}"
-        assert results[0]['status']['message'] == 'OK', f"Expected an 'OK' Status, instead found '{results[0]['status']['message']}': {resp.json()}"
-
-    def upload_files(self, album_id, files):
-        """
-        Given an Album ID and list of files, upload the files to the Album
-        :param album_id: The ID of the Google Photos Album
-        :type album_id: basestring
+        Given a list of files, upload the files to the Album
         :param files: List of files to upload
         :type files: list
+        :return: List of Upload Tokens
+        :rtype: list
         """
-        successfully_uploaded = 0
-        error_upload = 0
+        upload_tokens = list()
+        self.logger.info(f"Uploading {len(files)}...")
         for upload_file in tqdm(files):
-            upload_token = self.upload_file(upload_file)
-            if upload_token:
-                successfully_uploaded += 1
-                self.add_file_to_album(album_id, upload_token)
-            else:
-                error_upload += 1
-        self.logger.info(f"Successfully uploaded {successfully_uploaded} files, failed to upload {error_upload} files")
+            upload_tokens.append(self.upload_file(upload_file))
+        self.logger.info(f"Successfully uploaded {len(files)} files")
+        return upload_tokens
+
+    @staticmethod
+    def chunks(l, n):
+        """Yield successive n-sized chunks from l."""
+        for i in range(0, len(l), n):
+            yield l[i:i + n]
+
+    @backoff.on_exception(backoff.expo, requests.exceptions.RequestException, giveup=fatal_code)  # Gracefully handle throttling
+    def add_files_to_album(self, album_title, album_id, upload_tokens, chunk_size=50):
+        """
+        Given an Album Title, Album ID and a list of Upload Tokens, add the files to the album
+        See also: https://developers.google.com/photos/library/reference/rest/v1/mediaItems/batchCreate
+        :param album_title: The title of the album to upload files to
+        :type album_title: basestring
+        :param album_id: The ID of the Google Photos Album
+        :type album_id: basestring
+        :param upload_tokens: List of upload tokens of files uploaded to Google Photos
+        :type upload_tokens: list
+        :param chunk_size: The size of the chunks to add files to album (max of 50)
+        :type chunk_size: int
+        """
+        self.logger.info(f"Adding {len(upload_tokens)} files to '{album_title}' in chunks of {chunk_size}...")
+        with tqdm(total=len(upload_tokens)) as pbar:
+            for chunk in self.chunks(upload_tokens, chunk_size):
+                data = {
+                    'albumId': album_id,
+                    'newMediaItems': [{
+                        'simpleMediaItem': {
+                            'uploadToken': upload_token
+                        }
+                    } for upload_token in chunk]
+                }
+                resp = self.authed_session.post(
+                    'https://photoslibrary.googleapis.com/v1/mediaItems:batchCreate',
+                    data=json.dumps(data)
+                )
+                resp.raise_for_status()
+                results = resp.json()['newMediaItemResults']
+                assert len(results) == len(chunk), f"Expected to find {len(upload_tokens)} mediaItem instead found {len(results)}: {resp.json()}"
+                for result in results:
+                    assert result['status']['message'] == 'OK', f"Expected an 'OK' Status, instead found '{result['status']['message']}': {result}"
+                self.logger.debug(f"Added {len(chunk)} files to '{album_title}'")
+                pbar.update(len(chunk))
+            self.logger.info(f"Successfully Added {len(upload_tokens)} files to '{album_title}'")
 
     def run(self, album_title, directory):
         """
@@ -170,7 +196,9 @@ class GooglePhotosUploader(object):
         """
         album_id = self.get_album_id(album_title)
         files = self.get_files(directory)
-        self.upload_files(album_id, files)
+        upload_tokens = self.upload_files(files)
+        self.add_files_to_album(album_title, album_id, upload_tokens)
+
 
 
 if __name__ == '__main__':
