@@ -18,7 +18,11 @@ This script has been tested uploading a directory with over 5000 images in it.
 Please visit this URL to authorize this application: https://accounts.google.com/o/oauth2/auth?response_type=code&client_id=<your_client_id>&redirect_uri=urn%3Aietf%3Awg%3Aoauth%3A2.0%3Aoob&scope=https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fphotoslibrary&state=<custom_state>&prompt=consent&access_type=offline
 Enter the authorization code:
 ```
-3. Enter in your authorization code.
+3. Visit the provided URL and agree to terms:
+![agree to terms](assets/agree_to_terms.png)
+4. Copy the authorization code from the following page:
+![copy code](assets/copy_code.png)
+5. Enter in your authorization code in the terminal and hit enter.
 
 Note: If the album doesn't exist this script will create it for you.
 
