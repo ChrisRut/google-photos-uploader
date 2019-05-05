@@ -22,6 +22,17 @@ Enter the authorization code:
 
 Note: If the album doesn't exist this script will create it for you.
 
+## Example Run
+
+```bash
+$ ./uploader.py -a "My Photos" -d photos/
+Please visit this URL to authorize this application: https://accounts.google.com/o/oauth2/auth?response_type=code&client_id=<your_client_id>&redirect_uri=urn%3Aietf%3Awg%3Aoauth%3A2.0%3Aoob&scope=https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fphotoslibrary&state=<custom_state>&prompt=consent&access_type=offline
+Enter the authorization code: <your_authorization_code>
+Found 5442 files in photos/
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████| 5442/5442 [3:11:22<00:00,  1.70s/it]
+Successfully uploaded 5442 files, failed to upload 0 files
+```
+
 ## TODOs
 
 - Provide caching of credentials so you don't need to re-authenticate on every run
