@@ -22,7 +22,7 @@ def fatal_code(e):
     :return: True if the status code is != 429, otherwise false
     :rtype: bool
     """
-    return e.response.status_code != 429
+    return e.response.status_code not in [409, 429]
 
 class GooglePhotosUploader(object):
     def __init__(self, credentials_file, log_level):
@@ -62,16 +62,18 @@ class GooglePhotosUploader(object):
         self.logger.info(f"Successfully created album '{album_title}'.")
         return resp.json()['id']
 
-    def get_album_id(self, album_title):
+    def get_album_id(self, album_title, page_size=50):
         """
         Given an album title find the album or prompt the user to create one
         See also: https://developers.google.com/photos/library/reference/rest/v1/albums/list
         :param album_title: The title of the album
         :type album_title: basestring
+        :param page_size: The number of results to return in pagination
+        :type page_size: int
         :return: Album ID
         :rtype: basestring
         """
-        resp = self.authed_session.get('https://photoslibrary.googleapis.com/v1/albums', params={'pageSize': 50})
+        resp = self.authed_session.get('https://photoslibrary.googleapis.com/v1/albums', params={'pageSize': page_size})
         resp.raise_for_status()
         for album in resp.json().get('albums',[]):
             if album.get('title') == album_title:
@@ -79,7 +81,7 @@ class GooglePhotosUploader(object):
                 return album['id']
         while resp.json().get('nextPageToken'):
             self.logger.debug(f"nextPageToken: {resp.json().get('nextPageToken')}")
-            resp = self.authed_session.get('https://photoslibrary.googleapis.com/v1/albums', params={'pageSize': 50, 'pageToken': resp.json().get('nextPageToken')})
+            resp = self.authed_session.get('https://photoslibrary.googleapis.com/v1/albums', params={'pageSize': page_size, 'pageToken': resp.json().get('nextPageToken')})
             resp.raise_for_status()
             for album in resp.json().get('albums', []):
                 if album.get('title') == album_title:
@@ -124,6 +126,7 @@ class GooglePhotosUploader(object):
                 },
                 data=f,
             )
+            self.logger.debug(resp.text)
             resp.raise_for_status()
             self.logger.debug(f"Successfully uploaded {upload_file}: {resp.text}")
             return resp.text
@@ -137,7 +140,7 @@ class GooglePhotosUploader(object):
         :rtype: list
         """
         upload_tokens = list()
-        self.logger.info(f"Uploading {len(files)}...")
+        self.logger.info(f"Uploading {len(files)} files...")
         for upload_file in tqdm(files):
             upload_tokens.append(self.upload_file(upload_file))
         self.logger.info(f"Successfully uploaded {len(files)} files")
@@ -178,6 +181,7 @@ class GooglePhotosUploader(object):
                     'https://photoslibrary.googleapis.com/v1/mediaItems:batchCreate',
                     data=json.dumps(data)
                 )
+                self.logger.debug(resp.json())
                 resp.raise_for_status()
                 results = resp.json()['newMediaItemResults']
                 assert len(results) == len(chunk), f"Expected to find {len(upload_tokens)} mediaItem instead found {len(results)}: {resp.json()}"

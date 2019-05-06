@@ -34,8 +34,20 @@ $ ./uploader.py -a "My Photos" -d photos/
 Please visit this URL to authorize this application: https://accounts.google.com/o/oauth2/auth?response_type=code&client_id=<your_client_id>&redirect_uri=urn%3Aietf%3Awg%3Aoauth%3A2.0%3Aoob&scope=https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fphotoslibrary&state=<custom_state>&prompt=consent&access_type=offline
 Enter the authorization code: <your_authorization_code>
 Found 5442 files in photos/
-100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████| 5442/5442 [3:11:22<00:00,  1.70s/it]
-Successfully uploaded 5442 files, failed to upload 0 files
+Uploading 5442 files...
+ 41%|████▏     | 2257/5442 [07:58<10:18,  5.15it/s]
+Backing off upload_file(...) for 0.6s (requests.exceptions.HTTPError: 429 Client Error: Too Many Requests for url: https://photoslibrary.googleapis.com/v1/uploads)
+Backing off upload_file(...) for 0.6s (requests.exceptions.HTTPError: 429 Client Error: Too Many Requests for url: https://photoslibrary.googleapis.com/v1/uploads)
+ 74%|███████▍  | 4026/5442 [13:58<04:21,  5.42it/s]
+Backing off upload_file(...) for 0.1s (requests.exceptions.HTTPError: 429 Client Error: Too Many Requests for url: https://photoslibrary.googleapis.com/v1/uploads)
+ 74%|███████▍  | 4027/5442 [13:58<05:26,  4.33it/s]
+Backing off upload_file(...) for 0.7s (requests.exceptions.HTTPError: 429 Client Error: Too Many Requests for url: https://photoslibrary.googleapis.com/v1/uploads)
+Backing off upload_file(...) for 1.7s (requests.exceptions.HTTPError: 429 Client Error: Too Many Requests for url: https://photoslibrary.googleapis.com/v1/uploads)
+100%|██████████| 5442/5442 [18:49<00:00,  5.84it/s]
+Successfully uploaded 5442 files
+Adding 5442 files to 'My Photos' in chunks of 50...
+100%|██████████| 5442/5442 [09:03<00:00,  9.92it/s]
+Successfully Added 5442 files to 'My Photos'
 ```
 
 ## TODOs
