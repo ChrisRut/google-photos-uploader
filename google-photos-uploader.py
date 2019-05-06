@@ -15,14 +15,15 @@ from tqdm import tqdm
 
 def fatal_code(e):
     """
-    Only give up on non-429 status codes, otherwise re-try call w/ backoff
+    Only give up on unknown status codes, otherwise re-try call w/ backoff
     See also: https://github.com/litl/backoff
     :param e: Exception object
     :type e: object
-    :return: True if the status code is != 429, otherwise false
+    :return: True if the status code is not in the list of retry_codes, otherwise false
     :rtype: bool
     """
-    return e.response.status_code not in [409, 429]
+    retry_codes = [409, 429]
+    return e.response.status_code not in retry_codes
 
 class GooglePhotosUploader(object):
     def __init__(self, credentials_file, log_level):
