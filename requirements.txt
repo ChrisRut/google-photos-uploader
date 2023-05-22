@@ -1,5 +1,5 @@
 backoff==1.8.0
 google-auth-oauthlib==0.3.0
 google-auth==1.6.3
-requests==2.21.0
+requests==2.31.0
 tqdm==4.31.1
